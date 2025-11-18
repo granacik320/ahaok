@@ -29,7 +29,13 @@ setLoading(true);
 try {
   const response = await axios.post('/api/auth/login', formData);
   setUser(response.data.user, response.data.token);
-  router.push('/dashboard');
+
+  // Przekieruj do quizu jeśli nie ukończony onboarding
+  if (!response.data.onboardingCompleted) {
+    router.push('/onboarding');
+  } else {
+    router.push('/dashboard');
+  }
 } catch (err) {
   setError(err.response?.data?.error || 'Błąd podczas logowania');
 } finally {

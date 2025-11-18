@@ -98,9 +98,17 @@ class Database {
           difficulty_levels TEXT,
           regions TEXT,
           activity_types TEXT,
+          onboarding_completed BOOLEAN DEFAULT 0,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
       `);
+
+      // Add onboarding_completed column if it doesn't exist (for existing databases)
+      try {
+        await this.rawRun(`ALTER TABLE user_preferences ADD COLUMN onboarding_completed BOOLEAN DEFAULT 0`);
+      } catch (e) {
+        // Column already exists, ignore error
+      }
 
       // Ensure user_id is unique so ON CONFLICT(user_id) works correctly
       await this.rawRun(`

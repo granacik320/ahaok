@@ -40,6 +40,12 @@ export async function POST(request) {
     // Generuj token
     const token = generateToken(user.id, user.email);
 
+    // Sprawdź status onboardingu
+    const preferences = await db.get(
+      'SELECT onboarding_completed FROM user_preferences WHERE user_id = ?',
+      [user.id]
+    );
+
     return NextResponse.json({
       success: true,
       token,
@@ -47,7 +53,8 @@ export async function POST(request) {
         id: user.id,
         email: user.email,
         name: user.name
-      }
+      },
+      onboardingCompleted: preferences?.onboarding_completed === 1
     });
 
   } catch (error) {

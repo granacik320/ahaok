@@ -46,7 +46,8 @@ export default function RegisterPage() {
       });
 
       setUser(response.data.user, response.data.token);
-      router.push("/dashboard");
+      // Nowi użytkownicy zawsze idą do quizu onboardingowego
+      router.push("/onboarding");
     } catch (err) {
       setError(err.response?.data?.error || "Błąd podczas rejestracji");
     } finally {
