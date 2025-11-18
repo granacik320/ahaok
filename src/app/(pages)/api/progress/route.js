@@ -28,19 +28,22 @@ export async function GET(request) {
       [user.userId]
     );
 
-    // Statystyki
-    const stats = await db.get(
-      `SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed
+    // Statystyki - total to wszystkie aktywności, completed to ukończone przez użytkownika
+    const totalActivities = await db.get('SELECT COUNT(*) as count FROM activities');
+
+    const completedCount = await db.get(
+      `SELECT COUNT(*) as count
        FROM user_progress
-       WHERE user_id = ?`,
+       WHERE user_id = ? AND completed = 1`,
       [user.userId]
     );
 
     return NextResponse.json({
       progress,
-      stats: stats || { total: 0, completed: 0 }
+      stats: {
+        total: totalActivities?.count || 0,
+        completed: completedCount?.count || 0
+      }
     });
 
   } catch (error) {
