@@ -6,17 +6,36 @@ const dbPath = path.join(process.cwd(), 'malopolska_outdoor.db');
 
 class Database {
   constructor() {
+    this.initPromise = new Promise((resolve, reject) => {
+      this.initResolve = resolve;
+      this.initReject = reject;
+    });
+
     this.db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening database:', err);
+        if (this.initReject) {
+          this.initReject(err);
+        }
       } else {
         console.log('Connected to SQLite database');
-        this.initialize();
+        this.initialize()
+          .then(() => {
+            if (this.initResolve) {
+              this.initResolve();
+            }
+          })
+          .catch((error) => {
+            console.error('Database initialization error:', error);
+            if (this.initReject) {
+              this.initReject(error);
+            }
+          });
       }
     });
   }
 
-  run(sql, params = []) {
+  rawRun(sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) reject(err);
@@ -25,7 +44,7 @@ class Database {
     });
   }
 
-  get(sql, params = []) {
+  rawGet(sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err, row) => {
         if (err) reject(err);
@@ -34,7 +53,7 @@ class Database {
     });
   }
 
-  all(sql, params = []) {
+  rawAll(sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -43,10 +62,25 @@ class Database {
     });
   }
 
+  async run(sql, params = []) {
+    await this.initPromise;
+    return this.rawRun(sql, params);
+  }
+
+  async get(sql, params = []) {
+    await this.initPromise;
+    return this.rawGet(sql, params);
+  }
+
+  async all(sql, params = []) {
+    await this.initPromise;
+    return this.rawAll(sql, params);
+  }
+
   async initialize() {
     try {
       // Users table
-      await this.run(`
+      await this.rawRun(`
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           email TEXT UNIQUE NOT NULL,
@@ -57,7 +91,7 @@ class Database {
       `);
 
       // User preferences table
-      await this.run(`
+      await this.rawRun(`
         CREATE TABLE IF NOT EXISTS user_preferences (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER NOT NULL,
@@ -68,8 +102,14 @@ class Database {
         )
       `);
 
+      // Ensure user_id is unique so ON CONFLICT(user_id) works correctly
+      await this.rawRun(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_user_preferences_user_id
+        ON user_preferences(user_id)
+      `);
+
       // Activities table
-      await this.run(`
+      await this.rawRun(`
         CREATE TABLE IF NOT EXISTS activities (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
@@ -87,7 +127,7 @@ class Database {
       `);
 
       // User progress table
-      await this.run(`
+      await this.rawRun(`
         CREATE TABLE IF NOT EXISTS user_progress (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER NOT NULL,
@@ -103,7 +143,7 @@ class Database {
       `);
 
       // Challenges table
-      await this.run(`
+      await this.rawRun(`
         CREATE TABLE IF NOT EXISTS challenges (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           title TEXT NOT NULL,
@@ -115,7 +155,7 @@ class Database {
       `);
 
       // User challenges table
-      await this.run(`
+      await this.rawRun(`
         CREATE TABLE IF NOT EXISTS user_challenges (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER NOT NULL,
@@ -134,12 +174,13 @@ class Database {
 
       console.log('Database initialized successfully');
     } catch (error) {
-      console.error('Database initialization error:', error);
+      throw error;
     }
   }
 
   async seedActivities() {
-    const count = await this.get('SELECT COUNT(*) as count FROM activities');
+    const count = await this.rawGet('SELECT COUNT(*) as count FROM activities');
+
     if (count.count > 0) return;
 
     const activities = [
@@ -266,7 +307,7 @@ class Database {
     ];
 
     for (const activity of activities) {
-      await this.run(
+      await this.rawRun(
         `INSERT INTO activities (name, description, difficulty, region, activity_type, location, duration, distance, elevation, image_url)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -288,7 +329,8 @@ class Database {
   }
 
   async seedChallenges() {
-    const count = await this.get('SELECT COUNT(*) as count FROM challenges');
+    const count = await this.rawGet('SELECT COUNT(*) as count FROM challenges');
+
     if (count.count > 0) return;
 
     const challenges = [
@@ -313,7 +355,7 @@ class Database {
     ];
 
     for (const challenge of challenges) {
-      await this.run(
+      await this.rawRun(
         `INSERT INTO challenges (title, description, target_count, period)
          VALUES (?, ?, ?, ?)`,
         [challenge.title, challenge.description, challenge.target_count, challenge.period]

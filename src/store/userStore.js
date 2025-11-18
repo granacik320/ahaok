@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import localforage from "localforage";
 const storage = {
   getItem: async (name) => {
@@ -41,7 +41,12 @@ export const useUserStore = create(
     }),
     {
       name: "user-storage",
-      storage,
+      storage: createJSONStorage(() => storage),
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );
